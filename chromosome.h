@@ -4,16 +4,17 @@
 
 class chromosome {
 public:
+	chromosome();
 	chromosome(const chromosome&);
 	chromosome& operator=(const chromosome&);
-	chromosome(int, int, std::vector<std::vector<double>>&);
-	static chromosome crossover(const chromosome&, const chromosome&, int, bool, std::vector<std::vector<double>>);
-	chromosome mutate(int, int, std::vector<std::vector<double>>&) const;
+	chromosome(int, int, const std::vector<std::vector<double>>&);
+	static chromosome crossover(const chromosome&, const chromosome&, int, int, bool, const std::vector<std::vector<double>>);
+	chromosome mutate(int, int, const std::vector<std::vector<double>>&) const;
+	chromosome inverse(int, int, const std::vector<std::vector<double>>&);
 	double getQuality() const;
 	friend std::ostream& operator<<(std::ostream&, chromosome&);
 private:
-	chromosome();
 	std::vector<int> ch;
-	void countQuality(std::vector<std::vector<double>>&);
+	void countQuality(const std::vector<std::vector<double>>&);
 	double quality;
 };
