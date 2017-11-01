@@ -3,18 +3,9 @@
 #include <time.h>
 #include <algorithm>
 #include <math.h>
-#include <thread>
-#include <mutex>
 
 #include "chromosome.h"
 using namespace std;
-
-int n, populationSize, iterationCount, maxEpsilonHit, partsCount;
-double crossoverProbability, mutationProbability, inversionProbability;
-
-chromosome best;
-
-mutex accessBest, accessCout;
 
 int selectOneFromPopulation(vector<chromosome>& population, bool best) {
 	unsigned i = 0;
@@ -38,8 +29,27 @@ bool use(double p) {
 	return r <= p;
 }
 
-void geneticsAlgorithm(const vector<vector<double>>& graph, unsigned threadNumber) {
+int main() {
+	int n, populationSize, iterationCount, maxEpsilonHit, partsCount;
+	double selectionFactor, crossoverProbability, mutationProbability, inversionProbability;
+
+	srand(time(0));
+	cin >> n;
+	cin >> populationSize >> iterationCount >> partsCount >> crossoverProbability >> inversionProbability >> mutationProbability >> maxEpsilonHit >> selectionFactor;
+
+	vector<vector<double>> graph(n, vector<double>());
+
+	for (int i = 0; i < n; i++) {
+		for (int j = 0; j < n; j++) {
+			double w;
+			//cin >> w;
+			w = use(.3) ? 10.*rand() / RAND_MAX : 0;
+			graph.at(i).push_back(w);
+		}
+	}
+
 	vector<chromosome> population;
+
 
 	//Initial population
 	for (int i = 0; i < populationSize; i++) {
@@ -47,24 +57,23 @@ void geneticsAlgorithm(const vector<vector<double>>& graph, unsigned threadNumbe
 	}
 	sort(population.begin(), population.end(), [](const chromosome& a, const chromosome& b) {return a.getQuality() > b.getQuality(); });
 	auto best = population.end() - 1;
+	chromosome bestChromosomeEver = *best;
 
 	//Genetic algorithm iterations
 	double epsilon = 1;
 	double previousQuality;
 	int epsilonHit = 0;
+	int selectionSize = (int)(population.size() * selectionFactor);
+	chromosome *children = new chromosome[2 * ((selectionSize + 1) / 2)];
 
 	for (int t = 0; (t < iterationCount) && (epsilonHit < maxEpsilonHit); t++) {
-		
-		if (!(t % 1)) {
-			accessCout.lock();
-			cout << "[" << threadNumber << "]" << "Iteration " << t << ": " << best->getQuality() << endl;
-			accessCout.unlock();
+		if (!(t % 10)) {
+			cout << "Iteration " << t << ": " << best->getQuality() << endl;
 		}
 		previousQuality = best->getQuality();
 
 		//Selection, crossover, inversion, mutation
-		int selectionSize = population.size() / 3 * 2;
-		vector<chromosome> children;
+		int childrenCount = 0;
 		for (int k = 0; k < selectionSize; k += 2) {
 			if (use(crossoverProbability)) {
 				int i = selectOneFromPopulation(population, true);
@@ -87,18 +96,19 @@ void geneticsAlgorithm(const vector<vector<double>>& graph, unsigned threadNumbe
 				}
 
 				//mutation
-				if (use(mutationProbability * (threadNumber + 1))) {
+				if (use(mutationProbability)) {
 					c1 = c1.mutate(selectOne(n - 1), selectOne(n - 1), graph);
 				}
-				if (use(mutationProbability * (threadNumber + 1))) {
+				if (use(mutationProbability)) {
 					c2 = c2.mutate(selectOne(n - 1), selectOne(n - 1), graph);
 				}
 
-				children.push_back(c1);
-				children.push_back(c2);
+				children[childrenCount] = c1;
+				children[childrenCount + 1] = c2;
+				childrenCount += 2;
 			}
 		}
-		population.insert(population.end(), children.begin(), children.end());
+		population.insert(population.end(), children, children + childrenCount);
 
 		//Reduction
 		sort(population.begin(), population.end(), [](const chromosome& a, const chromosome& b) {return a.getQuality() > b.getQuality(); });
@@ -115,44 +125,11 @@ void geneticsAlgorithm(const vector<vector<double>>& graph, unsigned threadNumbe
 			epsilonHit = 0;
 		}
 
-		accessBest.lock();
-		if ((best->getQuality() < ::best.getQuality()) || (::best.getQuality() == -1)) {
-			::best = *best;
-		}
-		accessBest.unlock();
-	}
-}
-
-int main() {
-	srand(time(0));
-	cin >> n;
-	cin >> populationSize >> iterationCount >> partsCount >> crossoverProbability >> inversionProbability >> mutationProbability >> maxEpsilonHit;
-
-	vector<vector<double>> graph(n, vector<double>());
-
-	for (int i = 0; i < n; i++) {
-		for (int j = 0; j < n; j++) {
-			double w;
-			cin >> w;
-			//w = use(.3) ? 10.*rand() / RAND_MAX : 0;
-			graph.at(i).push_back(w);
+		if ((best->getQuality() < bestChromosomeEver.getQuality()) || (bestChromosomeEver.getQuality() == -1)) {
+			bestChromosomeEver = *best;
 		}
 	}
 
-	unsigned numberOfThreads = thread::hardware_concurrency();
-	if (!numberOfThreads) {
-		numberOfThreads = 1;
-	}
-
-	thread **threads = new thread*[numberOfThreads];
-	for (unsigned i = 0; i < numberOfThreads; i++) {
-		threads[i] = new thread(geneticsAlgorithm, graph, i);
-	}
-
-	for (unsigned i = 0; i < numberOfThreads; i++) {
-		threads[i]->join();
-	}
-	delete[] threads;
-	cout << best.getQuality() << endl;
+	cout << bestChromosomeEver.getQuality() << endl;
 	system("pause");
 }

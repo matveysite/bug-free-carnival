@@ -1,6 +1,8 @@
 #include "chromosome.h"
 #include <algorithm>
 #include <vector>
+#include <thread>
+#include <mutex>
 using namespace std;
 
 chromosome::chromosome(): ch(), quality(-1) {
@@ -8,13 +10,31 @@ chromosome::chromosome(): ch(), quality(-1) {
 
 void chromosome::countQuality(const vector<vector<double>>& graph) {
 	quality = 0;
-	for (unsigned i = 0; i < graph.size(); i++) {
-		for (unsigned j = 0; j < graph.size(); j++) {
-			if (ch[i] != ch[j]) {
-				quality += graph[i][j];
+	unsigned numberOfThreads = thread::hardware_concurrency();
+	if (!numberOfThreads) {
+		numberOfThreads = 1;
+	}
+
+	thread **threads = new thread*[numberOfThreads];
+	double *results = new double[numberOfThreads]();
+	auto qualityCounter = [&, this](int threadNumber) {
+		for (unsigned i = threadNumber; i < graph.size(); i += numberOfThreads) {
+			for (unsigned j = 0; j < graph.size(); j++) {
+				if (ch[i] != ch[j]) {
+					results[threadNumber] += graph[i][j];
+				}
 			}
 		}
+	};
+	for (unsigned i = 0; i < numberOfThreads; i++) {
+		threads[i] = new thread(qualityCounter, i);
 	}
+
+	for (unsigned i = 0; i < numberOfThreads; i++) {
+		threads[i]->join();
+		quality += results[i];
+	}
+	delete[] threads;
 }
 
 chromosome::chromosome(const chromosome& chromosome): ch(chromosome.ch), quality(chromosome.quality) {
@@ -37,14 +57,12 @@ chromosome::chromosome(int n, int partsCount, const vector<vector<double>>& grap
 	countQuality(graph);
 }
 
-chromosome chromosome::crossover(const chromosome& c1, const chromosome& c2, int p, int partsCount, bool first, const vector<vector<double>> graph) {
+chromosome chromosome::crossover(const chromosome& c1, const chromosome& c2, int p, int partsCount, bool first, const vector<vector<double>>& graph) {
 	chromosome result;
 	const chromosome& cf = first ? c1 : c2;
 	const chromosome& cs = first ? c2 : c1;
 
-	for (unsigned i = 0; i < p + 1; i++) {
-		result.ch.push_back(cf.ch[i]);
-	}
+	result.ch.insert(result.ch.begin(), cf.ch.begin(), cf.ch.begin() + p + 1);
 
 	int *partsNeeded = new int[partsCount]();
 	for (unsigned i = p + 1; i < cf.ch.size(); i++) {
